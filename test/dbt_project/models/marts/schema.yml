@@ -1,0 +1,50 @@
+version: 2
+
+models:
+  - name: customers
+    description: One row per customer with lifetime value.
+    meta:
+      owner: analytics
+    columns:
+      - name: customer_id
+        description: Primary key.
+        tests: [unique, not_null]
+      - name: customer_lifetime_value
+        description: Total paid in dollars.
+  - name: orders
+    description: One row per order with its amount.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: order_id
+        data_type: integer
+        constraints:
+          - type: not_null
+        tests: [unique]
+      - name: customer_id
+        data_type: integer
+        tests:
+          - relationships:
+              to: ref('customers')
+              field: customer_id
+      - name: order_date
+        data_type: date
+      - name: status
+        data_type: varchar
+      - name: amount
+        data_type: double
+
+exposures:
+  - name: weekly_revenue
+    label: Weekly revenue dashboard
+    type: dashboard
+    maturity: high
+    url: https://bi.example.com/dashboards/1
+    description: Revenue by week.
+    depends_on:
+      - ref('orders')
+      - ref('customers')
+    owner:
+      name: Data Team
+      email: data@example.com

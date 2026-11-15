@@ -1,0 +1,15 @@
+[
+ {
+  "id": 70403,
+  "name": "Jaffle Shop Analytics",
+  "state": 1,
+  "plan": "enterprise",
+  "pending_cancel": false,
+  "run_slots": 5,
+  "developer_seats": 10,
+  "read_only_seats": 20,
+  "locked": false,
+  "created_at": "2024-02-01 10:00:00.000000+00:00",
+  "updated_at": "2026-10-01 10:00:00.000000+00:00"
+ }
+]

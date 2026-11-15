@@ -1,0 +1,220 @@
+# name: test/sql/cloud.test
+# description: dbt Cloud Admin + Discovery API tables against the offline fixture server
+# group: [dbt]
+
+require vgi
+
+require-env DBT_WORKER
+
+require-env DBT_MOCK_API
+
+require-env DBT_MOCK_API_AUTH
+
+statement ok
+ATTACH 'dbt' (TYPE vgi, LOCATION '{DBT_WORKER}');
+
+# No secret yet: a clear error naming the secret type.
+statement error
+SELECT * FROM dbt.cloud.accounts;
+----
+no dbt_cloud secret
+
+# A wrong token is the API's 401, with the status code in the message.
+statement ok
+CREATE SECRET dbt_bad (TYPE dbt_cloud, TOKEN 'wrong', ACCOUNT_ID '70403', BASE_URL '{DBT_MOCK_API_AUTH}');
+
+statement error
+SELECT * FROM dbt.cloud.accounts;
+----
+401
+
+statement ok
+DROP SECRET dbt_bad;
+
+# The flaky server answers every new URL with 429 + Retry-After once, and caps
+# list pages at 3 items, so every query below also retries and paginates.
+statement ok
+CREATE SECRET dbt_test (TYPE dbt_cloud, TOKEN 'test-token', ACCOUNT_ID '70403', BASE_URL '{DBT_MOCK_API}', ENVIRONMENT_ID '202');
+
+# The token never shows in duckdb_secrets().
+query T
+SELECT secret_string LIKE '%test-token%' FROM duckdb_secrets() WHERE name = 'dbt_test';
+----
+false
+
+query IT
+SELECT id, name FROM dbt.cloud.accounts;
+----
+70403	Jaffle Shop Analytics
+
+query IT
+SELECT id, name FROM dbt.cloud.projects ORDER BY id;
+----
+101	jaffle_shop
+102	finance_marts
+
+query ITT
+SELECT id, name, deployment_type FROM dbt.cloud.environments WHERE project_id = 101 ORDER BY id;
+----
+201	Development	NULL
+202	Production	production
+
+query ITTT
+SELECT id, name, schedule_cron, schedule_enabled FROM dbt.cloud.jobs ORDER BY id;
+----
+301	Nightly build	0 6 * * *	true
+302	CI	0 * * * *	false
+303	Finance hourly	0 * * * *	true
+
+query I
+SELECT count(*) FROM dbt.cloud.jobs WHERE environment_id = 203;
+----
+1
+
+# All eight runs across three pages, newest first from the API.
+query IITTR
+SELECT count(*), count(DISTINCT job_id), min(status), max(job_name), sum(duration_seconds) FROM dbt.cloud.runs();
+----
+8	3	Cancelled	Nightly build	2520.0
+
+query ITT
+SELECT id, status, trigger_cause FROM dbt.cloud.runs() WHERE job_id = 301 AND status IN ('Success', 'Error') ORDER BY id;
+----
+9001	Success	Scheduled
+9004	Error	Scheduled
+9006	Success	Triggered via API
+
+query I
+SELECT id FROM dbt.cloud.runs() WHERE created_at >= TIMESTAMPTZ '2026-11-03 00:00:00+00' ORDER BY id;
+----
+9005
+9006
+9007
+9008
+
+query I
+SELECT id FROM dbt.cloud.runs() WHERE status = 'Running';
+----
+9008
+
+# Incremental cursor: only runs newer than the one given.
+query I
+SELECT id FROM dbt.cloud.runs(cursor := '9005') ORDER BY id;
+----
+9006
+9007
+9008
+
+statement error
+SELECT * FROM dbt.cloud.runs(cursor := 'latest');
+----
+cursor must be a run id
+
+# The filters above reached the API as its own query parameters.
+statement ok
+LOAD httpfs;
+
+statement ok
+LOAD json;
+
+query I
+SELECT count(*) > 0 FROM read_json('{DBT_MOCK_API}/__requests')
+WHERE path = '/api/v2/accounts/70403/runs/' AND query LIKE '%job_definition_id=301%' AND query LIKE '%status__in=%5B10%2C20%5D%' ;
+----
+true
+
+query I
+SELECT count(*) > 0 FROM read_json('{DBT_MOCK_API}/__requests')
+WHERE path = '/api/v2/accounts/70403/runs/' AND query LIKE '%created_at__range=%5B%222026-11-03T00%3A00%3A00Z%22%';
+----
+true
+
+query I
+SELECT count(*) > 0 FROM read_json('{DBT_MOCK_API}/__requests') WHERE path = '/api/v3/accounts/70403/environments/' AND query LIKE '%project_id=101%';
+----
+true
+
+query ITT
+SELECT step_index, name, status FROM dbt.cloud.run_steps(9004) ORDER BY step_index;
+----
+1	Clone git repository	Success
+2	Create profile from connection Postgres	Success
+3	Invoke `dbt source freshness`	Success
+4	Invoke `dbt build`	Error
+
+query TT
+SELECT path, artifact_url FROM dbt.cloud.run_artifacts(9001) ORDER BY path;
+----
+catalog.json	dbt-cloud://runs/9001/catalog.json
+manifest.json	dbt-cloud://runs/9001/manifest.json
+run_results.json	dbt-cloud://runs/9001/run_results.json
+sources.json	dbt-cloud://runs/9001/sources.json
+
+# The artifact tables read a run's artifacts straight from dbt Cloud.
+query I
+SELECT count(*) FROM dbt.main.nodes('dbt-cloud://runs/9001/manifest.json') WHERE resource_type = 'model';
+----
+6
+
+query TI
+SELECT status, count(*) FROM dbt.main.run_results('dbt-cloud://jobs/301/run_results.json') WHERE status IN ('fail', 'warn') GROUP BY ALL ORDER BY ALL;
+----
+fail	1
+warn	1
+
+query T
+SELECT schema_version FROM dbt.main.artifact_info('dbt-cloud://runs/9001/catalog.json');
+----
+v1
+
+statement error
+SELECT * FROM dbt.main.nodes('dbt-cloud://runs/9002/manifest.json');
+----
+404
+
+statement error
+SELECT * FROM dbt.main.nodes('dbt-cloud://runs/latest');
+----
+dbt Cloud artifact paths look like
+
+# ------------------------------------------------------------- Discovery API
+
+query TT
+SELECT name, last_run_status FROM dbt.cloud.models() ORDER BY name;
+----
+customers	success
+orders	error
+stg_customers	success
+stg_orders	success
+stg_payments	success
+
+query TT
+SELECT name, last_run_error FROM dbt.cloud.models(environment_id := 202) WHERE unique_id = 'model.jaffle_shop.orders';
+----
+orders	relation does not exist
+
+query I
+SELECT count(*) > 0 FROM read_json('{DBT_MOCK_API}/__requests') WHERE path = '/graphql' AND variables LIKE '%"uniqueIds": ["model.jaffle_shop.orders"]%';
+----
+true
+
+query TI
+SELECT last_run_status, count(*) FROM dbt.cloud.tests() GROUP BY ALL ORDER BY ALL;
+----
+fail	1
+pass	2
+warn	1
+
+query TTR
+SELECT unique_id, freshness_status, age_seconds FROM dbt.cloud.sources() WHERE freshness_checked ORDER BY unique_id;
+----
+source.jaffle_shop.raw.raw_orders	pass	14400.0
+source.jaffle_shop.raw.raw_payments	error	172800.0
+
+statement error
+SELECT * FROM dbt.cloud.models(environment_id := 999);
+----
+unknown environment
+
+statement ok
+DROP SECRET dbt_test;

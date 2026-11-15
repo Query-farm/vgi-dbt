@@ -1,0 +1,56 @@
+[
+ {
+  "uniqueId": "source.jaffle_shop.raw.raw_orders",
+  "name": "raw_orders",
+  "sourceName": "raw",
+  "identifier": "raw_orders",
+  "database": "analytics",
+  "schema": "raw",
+  "description": "One row per order.",
+  "loader": "fivetran",
+  "freshness": {
+   "maxLoadedAt": "2026-11-03T02:00:00.000Z",
+   "maxLoadedAtTimeAgoInS": 14400.0,
+   "freshnessStatus": "pass",
+   "freshnessChecked": true,
+   "snapshottedAt": "2026-11-03T06:00:00.000Z",
+   "freshnessRunId": 9006
+  }
+ },
+ {
+  "uniqueId": "source.jaffle_shop.raw.raw_payments",
+  "name": "raw_payments",
+  "sourceName": "raw",
+  "identifier": "raw_payments",
+  "database": "analytics",
+  "schema": "raw",
+  "description": "",
+  "loader": "stripe",
+  "freshness": {
+   "maxLoadedAt": "2026-11-01T06:00:00.000Z",
+   "maxLoadedAtTimeAgoInS": 172800.0,
+   "freshnessStatus": "error",
+   "freshnessChecked": true,
+   "snapshottedAt": "2026-11-03T06:00:00.000Z",
+   "freshnessRunId": 9006
+  }
+ },
+ {
+  "uniqueId": "source.jaffle_shop.raw.raw_customers",
+  "name": "raw_customers",
+  "sourceName": "raw",
+  "identifier": "raw_customers",
+  "database": "analytics",
+  "schema": "raw",
+  "description": "",
+  "loader": "",
+  "freshness": {
+   "maxLoadedAt": null,
+   "maxLoadedAtTimeAgoInS": null,
+   "freshnessStatus": null,
+   "freshnessChecked": false,
+   "snapshottedAt": null,
+   "freshnessRunId": null
+  }
+ }
+]

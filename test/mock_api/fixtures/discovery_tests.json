@@ -1,0 +1,58 @@
+[
+ {
+  "uniqueId": "test.jaffle_shop.unique_customers_customer_id.c5af1ff4b1",
+  "name": "unique_customers_customer_id",
+  "description": "",
+  "columnName": "customer_id",
+  "testType": "GENERIC",
+  "executionInfo": {
+   "lastRunId": 9006,
+   "lastRunStatus": "pass",
+   "lastRunError": null,
+   "executeCompletedAt": "2026-11-03T06:11:00.000Z",
+   "executionTime": 0.1
+  }
+ },
+ {
+  "uniqueId": "test.jaffle_shop.relationships_orders_customer_id.c6ec7f58f2",
+  "name": "relationships_orders_customer_id",
+  "description": "",
+  "columnName": "customer_id",
+  "testType": "GENERIC",
+  "executionInfo": {
+   "lastRunId": 9006,
+   "lastRunStatus": "fail",
+   "lastRunError": "Got 4 results, configured to fail if != 0",
+   "executeCompletedAt": "2026-11-03T06:11:01.000Z",
+   "executionTime": 0.1
+  }
+ },
+ {
+  "uniqueId": "test.jaffle_shop.accepted_values_stg_payments_payment_method.1a6bf817f5",
+  "name": "accepted_values_stg_payments_payment_method",
+  "description": "",
+  "columnName": "payment_method",
+  "testType": "GENERIC",
+  "executionInfo": {
+   "lastRunId": 9006,
+   "lastRunStatus": "warn",
+   "lastRunError": "Got 1 result, configured to warn if != 0",
+   "executeCompletedAt": "2026-11-03T06:11:02.000Z",
+   "executionTime": 0.1
+  }
+ },
+ {
+  "uniqueId": "test.jaffle_shop.assert_positive_amounts",
+  "name": "assert_positive_amounts",
+  "description": "",
+  "columnName": null,
+  "testType": "SINGULAR",
+  "executionInfo": {
+   "lastRunId": 9006,
+   "lastRunStatus": "pass",
+   "lastRunError": null,
+   "executeCompletedAt": "2026-11-03T06:11:03.000Z",
+   "executionTime": 0.1
+  }
+ }
+]

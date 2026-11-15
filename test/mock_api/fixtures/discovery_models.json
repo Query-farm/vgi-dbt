@@ -1,0 +1,117 @@
+[
+ {
+  "uniqueId": "model.jaffle_shop.customers",
+  "name": "customers",
+  "description": "",
+  "packageName": "jaffle_shop",
+  "materializedType": "table",
+  "database": "analytics",
+  "schema": "prod",
+  "alias": "customers",
+  "tags": [
+   "marts"
+  ],
+  "filePath": "models/customers.sql",
+  "executionInfo": {
+   "lastRunId": 9006,
+   "lastRunStatus": "success",
+   "lastRunError": null,
+   "lastSuccessRunId": 9001,
+   "executeStartedAt": "2026-11-03T06:10:00.000Z",
+   "executeCompletedAt": "2026-11-03T06:10:00.000Z",
+   "executionTime": 2.5
+  }
+ },
+ {
+  "uniqueId": "model.jaffle_shop.orders",
+  "name": "orders",
+  "description": "",
+  "packageName": "jaffle_shop",
+  "materializedType": "table",
+  "database": "analytics",
+  "schema": "prod",
+  "alias": "orders",
+  "tags": [
+   "marts"
+  ],
+  "filePath": "models/orders.sql",
+  "executionInfo": {
+   "lastRunId": 9004,
+   "lastRunStatus": "error",
+   "lastRunError": "relation does not exist",
+   "lastSuccessRunId": 9001,
+   "executeStartedAt": "2026-11-02T06:09:00.000Z",
+   "executeCompletedAt": "2026-11-02T06:09:00.000Z",
+   "executionTime": 0.4
+  }
+ },
+ {
+  "uniqueId": "model.jaffle_shop.stg_customers",
+  "name": "stg_customers",
+  "description": "",
+  "packageName": "jaffle_shop",
+  "materializedType": "view",
+  "database": "analytics",
+  "schema": "prod",
+  "alias": "stg_customers",
+  "tags": [
+   "staging"
+  ],
+  "filePath": "models/stg_customers.sql",
+  "executionInfo": {
+   "lastRunId": 9006,
+   "lastRunStatus": "success",
+   "lastRunError": null,
+   "lastSuccessRunId": 9001,
+   "executeStartedAt": "2026-11-03T06:05:00.000Z",
+   "executeCompletedAt": "2026-11-03T06:05:00.000Z",
+   "executionTime": 0.2
+  }
+ },
+ {
+  "uniqueId": "model.jaffle_shop.stg_orders",
+  "name": "stg_orders",
+  "description": "",
+  "packageName": "jaffle_shop",
+  "materializedType": "view",
+  "database": "analytics",
+  "schema": "prod",
+  "alias": "stg_orders",
+  "tags": [
+   "staging"
+  ],
+  "filePath": "models/stg_orders.sql",
+  "executionInfo": {
+   "lastRunId": 9006,
+   "lastRunStatus": "success",
+   "lastRunError": null,
+   "lastSuccessRunId": 9001,
+   "executeStartedAt": "2026-11-03T06:05:00.000Z",
+   "executeCompletedAt": "2026-11-03T06:05:00.000Z",
+   "executionTime": 0.3
+  }
+ },
+ {
+  "uniqueId": "model.jaffle_shop.stg_payments",
+  "name": "stg_payments",
+  "description": "",
+  "packageName": "jaffle_shop",
+  "materializedType": "view",
+  "database": "analytics",
+  "schema": "prod",
+  "alias": "stg_payments",
+  "tags": [
+   "staging"
+  ],
+  "filePath": "models/stg_payments.sql",
+  "executionInfo": {
+   "lastRunId": 9006,
+   "lastRunStatus": "success",
+   "lastRunError": null,
+   "lastSuccessRunId": 9001,
+   "executeStartedAt": "2026-11-03T06:05:00.000Z",
+   "executeCompletedAt": "2026-11-03T06:05:00.000Z",
+   "executionTime": 0.2
+  }
+ }
+]

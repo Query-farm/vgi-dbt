@@ -1,0 +1,53 @@
+version: 2
+
+groups:
+  - name: finance
+    owner:
+      name: Finance Team
+      email: finance@example.com
+
+semantic_models:
+  - name: orders_sm
+    description: Orders as a semantic model.
+    model: ref('orders')
+    config:
+      group: finance
+    defaults:
+      agg_time_dimension: order_date
+    entities:
+      - name: order
+        type: primary
+        expr: order_id
+      - name: customer
+        type: foreign
+        expr: customer_id
+    dimensions:
+      - name: order_date
+        type: time
+        type_params:
+          time_granularity: day
+      - name: status
+        type: categorical
+    measures:
+      - name: order_total
+        agg: sum
+        expr: amount
+      - name: order_count
+        agg: count
+        expr: order_id
+
+metrics:
+  - name: revenue
+    label: Revenue
+    description: Sum of order amounts.
+    type: simple
+    config:
+      group: finance
+    type_params:
+      measure: order_total
+  - name: completed_orders
+    label: Completed orders
+    type: simple
+    type_params:
+      measure: order_count
+    filter: "{{ Dimension('order__status') }} = 'completed'"

@@ -1,0 +1,1 @@
+{"metadata": {"dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v12.json", "dbt_version": "1.12.7"}, "nodes": {"model.x.a": {"unique_id": "model.x.a", "name": "a", "raw_code": "select 

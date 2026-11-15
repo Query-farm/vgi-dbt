@@ -1,0 +1,200 @@
+# name: test/sql/graph.test
+# description: descendants / ancestors DAG walks (blended, LATERAL) and the selector subset
+# group: [dbt]
+
+require vgi
+
+require-env DBT_WORKER
+
+require-env DBT_FIXTURES
+
+require-env DBT_TEST_DATA
+
+statement ok
+LOAD json;
+
+statement ok
+ATTACH 'dbt' (TYPE vgi, LOCATION '{DBT_WORKER}');
+
+query TI
+SELECT unique_id, depth FROM dbt.main.descendants('model.jaffle_shop.stg_orders', manifest := '{DBT_FIXTURES}/v12/manifest.json')
+WHERE unique_id NOT LIKE 'test.%' ORDER BY depth, unique_id;
+----
+model.jaffle_shop.customers	1
+model.jaffle_shop.orders	1
+snapshot.jaffle_shop.orders_snapshot	1
+exposure.jaffle_shop.weekly_revenue	2
+semantic_model.jaffle_shop.orders_sm	2
+metric.jaffle_shop.completed_orders	3
+metric.jaffle_shop.revenue	3
+
+query TIT
+SELECT unique_id, depth, path::VARCHAR FROM dbt.main.ancestors('model.jaffle_shop.orders', manifest := '{DBT_FIXTURES}/v12/manifest.json', max_depth := 1) ORDER BY ALL;
+----
+model.jaffle_shop.stg_orders	1	[model.jaffle_shop.orders, model.jaffle_shop.stg_orders]
+model.jaffle_shop.stg_payments	1	[model.jaffle_shop.orders, model.jaffle_shop.stg_payments]
+
+query TI
+SELECT unique_id, depth FROM dbt.main.ancestors('model.jaffle_shop.stg_orders', manifest := '{DBT_FIXTURES}/v12/manifest.json', include_self := true) ORDER BY depth;
+----
+model.jaffle_shop.stg_orders	0
+source.jaffle_shop.raw.raw_orders	1
+
+# LATERAL over a column of roots: one exchange per chunk, rows stamped to their root.
+query TTI
+SELECT c.id, d.unique_id, d.depth
+FROM (VALUES ('model.jaffle_shop.stg_customers'), ('model.jaffle_shop.stg_payments'), ('model.jaffle_shop.nope')) c(id),
+     dbt.main.ancestors(c.id, manifest := '{DBT_FIXTURES}/v12/manifest.json') d
+ORDER BY ALL;
+----
+model.jaffle_shop.stg_customers	source.jaffle_shop.raw.raw_customers	1
+model.jaffle_shop.stg_payments	source.jaffle_shop.raw.raw_payments	1
+
+# Blast radius of several changed models, counted per root.
+query TI
+SELECT c.id, count(*) FILTER (WHERE d.unique_id LIKE 'model.%')
+FROM (VALUES ('model.jaffle_shop.stg_orders'), ('model.jaffle_shop.customers')) c(id),
+     dbt.main.descendants(c.id, manifest := '{DBT_FIXTURES}/v12/manifest.json') d
+GROUP BY ALL ORDER BY ALL;
+----
+model.jaffle_shop.customers	0
+model.jaffle_shop.stg_orders	2
+
+# A v5 manifest has no parent/child maps: the walk falls back to depends_on.
+query TI
+SELECT unique_id, depth FROM dbt.main.ancestors('model.old.orders', manifest := '{DBT_TEST_DATA}/synthetic/manifest_v5.json');
+----
+model.old.stg	1
+
+statement error
+SELECT * FROM dbt.main.descendants('model.jaffle_shop.stg_orders');
+----
+needs manifest
+
+statement error
+SELECT * FROM dbt.main.descendants('model.x', manifest := '{DBT_FIXTURES}/v12/run_results.json');
+----
+is a run_results artifact
+
+# ------------------------------------------------------------------ selectors
+
+query ITTTTTT
+SELECT * FROM dbt.main.parse_selector('tag:finance,+fct_orders') ORDER BY term;
+----
+1	+fct_orders	graph_op	fct_orders	false	false	graph operator "+" unsupported; use dbt.main.ancestors(...)
+1	tag:finance	tag	finance	false	true	NULL
+
+query TTT
+SELECT term, kind, supported FROM dbt.main.parse_selector('path:models/marts config.materialized:table orders --exclude tag:x') ORDER BY term_index;
+----
+path:models/marts	path	true
+config.materialized:table	config.materialized	true
+orders	name	true
+tag:x	exclude	false
+
+query T
+SELECT name FROM dbt.main.nodes('{DBT_FIXTURES}/v12/manifest.json')
+WHERE dbt.main.selector_match(unique_id, fqn, tags, materialized, 'tag:staging,config.materialized:view') ORDER BY name;
+----
+stg_customers
+stg_orders
+stg_payments
+
+query T
+SELECT name FROM dbt.main.nodes('{DBT_FIXTURES}/v12/manifest.json')
+WHERE dbt.main.selector_match(unique_id, fqn, tags, materialized, 'path:models/marts,resource_type:model resource_type:seed') ORDER BY name;
+----
+customers
+metricflow_time_spine
+orders
+raw_customers
+raw_orders
+raw_payments
+
+query T
+SELECT name FROM dbt.main.nodes('{DBT_FIXTURES}/v12/manifest.json')
+WHERE resource_type = 'model' AND dbt.main.selector_match(unique_id, fqn, tags, materialized, 'stg_*') ORDER BY name;
+----
+stg_customers
+stg_orders
+stg_payments
+
+query T
+SELECT name FROM dbt.main.nodes('{DBT_FIXTURES}/v12/manifest.json')
+WHERE resource_type = 'model' AND NOT dbt.main.selector_match(unique_id, fqn, tags, materialized, 'fqn:jaffle_shop.staging') ORDER BY name;
+----
+customers
+metricflow_time_spine
+orders
+
+query TTT
+SELECT dbt.main.selector_match('model.shop.orders', ['shop', 'marts', 'orders'], ['marts'], 'table', 'path:models/marts'),
+       dbt.main.selector_match('model.shop.orders', ['shop', 'marts', 'orders'], NULL, NULL, 'tag:marts'),
+       dbt.main.selector_match(NULL, NULL, NULL, NULL, 'orders') IS NULL;
+----
+true	false	true
+
+# Every unsupported term is a bind error naming it, never a silent false.
+statement error
+SELECT dbt.main.selector_match('a', ['a'], [], 'view', '+orders');
+----
+selector term "+orders": graph operator "+" unsupported
+
+statement error
+SELECT dbt.main.selector_match('a', ['a'], [], 'view', '2+orders');
+----
+selector term "2+orders": graph operator "2+" unsupported
+
+statement error
+SELECT dbt.main.selector_match('a', ['a'], [], 'view', 'orders+');
+----
+selector term "orders+": graph operator "+" unsupported; use dbt.main.descendants
+
+statement error
+SELECT dbt.main.selector_match('a', ['a'], [], 'view', '@orders');
+----
+selector term "@orders": graph operator "@" unsupported
+
+statement error
+SELECT dbt.main.selector_match('a', ['a'], [], 'view', 'state:modified');
+----
+selector term "state:modified": selector method "state:" unsupported
+
+statement error
+SELECT dbt.main.selector_match('a', ['a'], [], 'view', 'result:error');
+----
+selector term "result:error": selector method "result:" unsupported
+
+statement error
+SELECT dbt.main.selector_match('a', ['a'], [], 'view', 'source_status:fresher');
+----
+selector term "source_status:fresher": selector method "source_status:" unsupported
+
+# ------------------------------------------------------------------- scalars
+
+query TTTT
+SELECT p.resource_type, p.package, p.name, p.version FROM (SELECT dbt.main.parse_unique_id('model.jaffle_shop.orders.v2') AS p);
+----
+model	jaffle_shop	orders	2
+
+query TT
+SELECT dbt.main.parse_unique_id('test.jaffle_shop.unique_orders_order_id.fed79b3a6e').name,
+       dbt.main.parse_unique_id('source.jaffle_shop.raw.raw_orders').name;
+----
+unique_orders_order_id	raw.raw_orders
+
+query T
+SELECT dbt.main.parse_unique_id(NULL);
+----
+NULL
+
+query T
+SELECT dbt.main.normalize_relation(db_name, db_schema, alias, NULL) FROM dbt.main.nodes('{DBT_FIXTURES}/v12/manifest.json') WHERE name = 'orders';
+----
+jaffle_shop.main.orders
+
+query TT
+SELECT dbt.main.normalize_relation('"Analytics"', 'Main', 'Orders', '{"database": true}'),
+       dbt.main.normalize_relation(NULL, 'raw', 'my.table', NULL);
+----
+Analytics.main.orders	raw."my.table"

@@ -1,0 +1,121 @@
+[
+ {
+  "id": 301,
+  "account_id": 70403,
+  "project_id": 101,
+  "environment_id": 202,
+  "name": "Nightly build",
+  "description": "",
+  "dbt_version": null,
+  "job_type": "scheduled",
+  "triggers": {
+   "github_webhook": false,
+   "schedule": true,
+   "git_provider_webhook": false,
+   "on_merge": false
+  },
+  "execute_steps": [
+   "dbt source freshness",
+   "dbt build"
+  ],
+  "settings": {
+   "threads": 4,
+   "target_name": "prod"
+  },
+  "state": 1,
+  "generate_docs": true,
+  "run_generate_sources": true,
+  "schedule": {
+   "cron": "0 6 * * *",
+   "date": {
+    "type": "custom_cron",
+    "cron": "0 6 * * *"
+   },
+   "time": {
+    "type": "every_hour",
+    "interval": 1
+   }
+  },
+  "created_at": "2024-03-01 10:00:00.000000+00:00",
+  "updated_at": "2026-08-01 10:00:00.000000+00:00"
+ },
+ {
+  "id": 302,
+  "account_id": 70403,
+  "project_id": 101,
+  "environment_id": 202,
+  "name": "CI",
+  "description": "",
+  "dbt_version": null,
+  "job_type": "ci",
+  "triggers": {
+   "github_webhook": true,
+   "schedule": false,
+   "git_provider_webhook": false,
+   "on_merge": false
+  },
+  "execute_steps": [
+   "dbt build --select state:modified+"
+  ],
+  "settings": {
+   "threads": 4,
+   "target_name": "prod"
+  },
+  "state": 1,
+  "generate_docs": false,
+  "run_generate_sources": false,
+  "schedule": {
+   "cron": "0 * * * *",
+   "date": {
+    "type": "custom_cron",
+    "cron": "0 * * * *"
+   },
+   "time": {
+    "type": "every_hour",
+    "interval": 1
+   }
+  },
+  "created_at": "2024-03-01 10:00:00.000000+00:00",
+  "updated_at": "2026-08-01 10:00:00.000000+00:00"
+ },
+ {
+  "id": 303,
+  "account_id": 70403,
+  "project_id": 102,
+  "environment_id": 203,
+  "name": "Finance hourly",
+  "description": "",
+  "dbt_version": null,
+  "job_type": "scheduled",
+  "triggers": {
+   "github_webhook": false,
+   "schedule": true,
+   "git_provider_webhook": false,
+   "on_merge": false
+  },
+  "execute_steps": [
+   "dbt run",
+   "dbt test"
+  ],
+  "settings": {
+   "threads": 4,
+   "target_name": "prod"
+  },
+  "state": 1,
+  "generate_docs": false,
+  "run_generate_sources": false,
+  "schedule": {
+   "cron": "0 * * * *",
+   "date": {
+    "type": "custom_cron",
+    "cron": "0 * * * *"
+   },
+   "time": {
+    "type": "every_hour",
+    "interval": 1
+   }
+  },
+  "created_at": "2024-03-01 10:00:00.000000+00:00",
+  "updated_at": "2026-08-01 10:00:00.000000+00:00"
+ }
+]

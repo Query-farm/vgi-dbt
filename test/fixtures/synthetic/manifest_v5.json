@@ -1,0 +1,4 @@
+{"metadata": {"dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v5.json", "dbt_version": "1.1.0", "generated_at": "2022-05-01T00:00:00Z", "invocation_id": "old-0001", "env": {}},
+ "nodes": {"model.old.orders": {"unique_id": "model.old.orders", "resource_type": "model", "package_name": "old", "name": "orders", "fqn": ["old", "orders"], "tags": ["legacy"], "config": {"materialized": "view"}, "raw_sql": "select * from {{ ref('stg') }}", "compiled_sql": "select * from stg", "depends_on": {"nodes": ["model.old.stg"], "macros": []}},
+           "model.old.stg": {"unique_id": "model.old.stg", "resource_type": "model", "package_name": "old", "name": "stg", "fqn": ["old", "stg"], "tags": [], "config": {"materialized": "view"}, "raw_sql": "select 1 as id", "depends_on": {"nodes": [], "macros": []}}},
+ "sources": {}, "macros": {}, "exposures": {}, "metrics": {}, "parent_map": null, "child_map": null}

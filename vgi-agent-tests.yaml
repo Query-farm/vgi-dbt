@@ -1,0 +1,94 @@
+# Private graders for the public vgi.agent_test_tasks in the worker's catalog metadata.
+# `vgi-lint lint --ai` runs an agent on each prompt and grades it with reference_sql/check_sql.
+# See https://github.com/Query-farm/vgi-lint-check (VGI920). Every artifact task reads the
+# bundled samples (sample://), so it runs offline. The cloud_* tasks need a dbt_cloud
+# secret (the fixture server in test/mock_api works), so they only grade with one.
+tasks:
+  - name: models_by_materialization
+    reference_sql: >-
+      SELECT materialized, count(*) AS models FROM dbt.main.nodes('sample://jaffle_shop/v12/manifest.json')
+      WHERE resource_type = 'model' GROUP BY materialized ORDER BY materialized
+  - name: failed_tests
+    reference_sql: >-
+      SELECT unique_id FROM dbt.main.run_results('sample://jaffle_shop/v12/run_results.json')
+      WHERE status IN ('fail', 'error') AND unique_id LIKE 'test.%' ORDER BY unique_id
+  - name: downstream_of_stg_orders
+    reference_sql: >-
+      SELECT unique_id FROM dbt.main.descendants('model.jaffle_shop.stg_orders', manifest := 'sample://jaffle_shop/v12/manifest.json')
+      WHERE unique_id LIKE 'model.%' ORDER BY unique_id
+  - name: manifest_versions
+    reference_sql: >-
+      SELECT schema_version, dbt_version FROM dbt.main.artifact_info('sample://jaffle_shop/*/manifest.json')
+      ORDER BY schema_version, dbt_version
+  - name: sources_behind_customers
+    reference_sql: >-
+      SELECT s.unique_id, s.loaded_at_field
+      FROM dbt.main.ancestors('model.jaffle_shop.customers', manifest := 'sample://jaffle_shop/v12/manifest.json') a
+      JOIN dbt.main.sources('sample://jaffle_shop/v12/manifest.json') s ON s.unique_id = a.unique_id ORDER BY s.unique_id
+  - name: contract_drift
+    reference_sql: >-
+      SELECT d.name, d.data_type AS declared, c.column_type AS actual
+      FROM dbt.main.node_columns('sample://jaffle_shop/v12/manifest.json') d
+      JOIN dbt.main.catalog_columns('sample://jaffle_shop/v12/catalog.json') c
+        ON c.unique_id = d.unique_id AND lower(c.column_name) = lower(d.name)
+      WHERE d.unique_id = 'model.jaffle_shop.orders' ORDER BY d.name
+  - name: macro_usage
+    reference_sql: >-
+      SELECT d.unique_id AS model, m.name AS macro
+      FROM dbt.main.depends_on('sample://jaffle_shop/v12/manifest.json', kind := 'macros') d
+      JOIN dbt.main.macros('sample://jaffle_shop/v12/manifest.json') m ON m.unique_id = d.depends_on_id
+      WHERE m.package_name = 'jaffle_shop' AND d.unique_id LIKE 'model.%' ORDER BY ALL
+  - name: exposure_inputs
+    reference_sql: >-
+      SELECT unnest(depends_on_ids) AS model FROM dbt.main.exposures('sample://jaffle_shop/v12/manifest.json')
+      WHERE name = 'weekly_revenue' ORDER BY model
+  - name: finance_group
+    reference_sql: >-
+      SELECT g.owner_email,
+             (SELECT count(*) FROM dbt.main.metrics('sample://jaffle_shop/v12/manifest.json')) AS metrics,
+             (SELECT count(*) FROM dbt.main.semantic_models('sample://jaffle_shop/v12/manifest.json')) AS semantic_models
+      FROM dbt.main.groups('sample://jaffle_shop/v12/manifest.json') g WHERE g.name = 'finance'
+  - name: longest_execute
+    reference_sql: >-
+      SELECT unique_id FROM dbt.main.run_timings('sample://jaffle_shop/v12/run_results.json')
+      WHERE name = 'execute' ORDER BY duration_seconds DESC LIMIT 1
+  - name: stale_sources
+    reference_sql: >-
+      SELECT unique_id FROM dbt.main.source_freshness('sample://jaffle_shop/v12/sources.json')
+      WHERE status <> 'pass' ORDER BY unique_id
+  - name: staging_views
+    reference_sql: >-
+      SELECT name FROM dbt.main.nodes('sample://jaffle_shop/v12/manifest.json')
+      WHERE dbt.main.selector_match(unique_id, fqn, tags, materialized, 'tag:staging,config.materialized:view') ORDER BY name
+  - name: explain_selector
+    reference_sql: >-
+      SELECT term, supported FROM dbt.main.parse_selector('tag:finance +orders') ORDER BY term_index
+  - name: seed_relations
+    reference_sql: >-
+      SELECT dbt.main.parse_unique_id(unique_id).name AS seed, dbt.main.normalize_relation(db_name, db_schema, alias, NULL) AS relation
+      FROM dbt.main.nodes('sample://jaffle_shop/v12/manifest.json') WHERE resource_type = 'seed' ORDER BY seed
+  - name: v9_version
+    reference_sql: SELECT dbt.main.manifest_version('sample://jaffle_shop/v9/manifest.json') AS version
+  - name: supported_run_results
+    reference_sql: >-
+      SELECT schema_version FROM dbt.main.schema_versions WHERE artifact_type = 'run_results' AND supported ORDER BY schema_version
+  - name: unified_failures
+    check_sql: >-
+      SELECT count(*) = 6 AND bool_and(failed = 1)
+      FROM (SELECT r.run_id, count(*) FILTER (WHERE t.status = 'failed') AS failed
+            FROM dbt.unified.runs(path := 'sample://jaffle_shop/*/run_results.json') r
+            JOIN dbt.unified.task_runs(path := 'sample://jaffle_shop/*/run_results.json') t USING (run_id) GROUP BY r.run_id)
+  - name: cloud_failed_runs
+    check_sql: >-
+      SELECT count(*) > 0 FROM dbt.cloud.runs() r JOIN dbt.cloud.jobs j ON j.id = r.job_id
+      WHERE r.status = 'Error' AND EXISTS (SELECT 1 FROM dbt.cloud.run_steps(9004) s WHERE s.status = 'Error')
+  - name: cloud_inventory
+    check_sql: >-
+      SELECT count(*) > 0 FROM dbt.cloud.projects p JOIN dbt.cloud.environments e ON e.project_id = p.id
+      CROSS JOIN dbt.cloud.accounts a WHERE e.type = 'deployment'
+  - name: cloud_production_health
+    check_sql: >-
+      SELECT (SELECT count(*) FROM dbt.cloud.models() WHERE last_run_status = 'error') >= 0
+         AND (SELECT count(*) FROM dbt.cloud.tests() WHERE last_run_status = 'fail') >= 0
+         AND (SELECT count(*) FROM dbt.cloud.sources() WHERE freshness_status <> 'pass') >= 0
+         AND (SELECT count(*) FROM dbt.cloud.run_artifacts(9001)) >= 0

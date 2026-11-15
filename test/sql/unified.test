@@ -1,0 +1,114 @@
+# name: test/sql/unified.test
+# description: unified.runs / unified.task_runs over local run_results and dbt Cloud fixtures
+# group: [dbt]
+
+require vgi
+
+require-env DBT_WORKER
+
+require-env DBT_FIXTURES
+
+require-env DBT_MOCK_API
+
+statement ok
+LOAD json;
+
+statement ok
+ATTACH 'dbt' (TYPE vgi, LOCATION '{DBT_WORKER}');
+
+# The exact column contract shared with the other orchestrator workers.
+query TT
+SELECT column_name, column_type FROM (DESCRIBE SELECT * FROM dbt.unified.runs(path := '{DBT_FIXTURES}/v12/run_results.json'));
+----
+orchestrator	VARCHAR
+run_id	VARCHAR
+pipeline	VARCHAR
+status	VARCHAR
+raw_status	VARCHAR
+trigger	VARCHAR
+queued_at	TIMESTAMP WITH TIME ZONE
+started_at	TIMESTAMP WITH TIME ZONE
+ended_at	TIMESTAMP WITH TIME ZONE
+duration_seconds	DOUBLE
+url	VARCHAR
+
+query TT
+SELECT column_name, column_type FROM (DESCRIBE SELECT * FROM dbt.unified.task_runs(path := '{DBT_FIXTURES}/v12/run_results.json'));
+----
+orchestrator	VARCHAR
+run_id	VARCHAR
+task_run_id	VARCHAR
+task_name	VARCHAR
+status	VARCHAR
+raw_status	VARCHAR
+attempt	INTEGER
+started_at	TIMESTAMP WITH TIME ZONE
+ended_at	TIMESTAMP WITH TIME ZONE
+duration_seconds	DOUBLE
+url	VARCHAR
+
+# Each run_results.json is one invocation.
+query ITTTT
+SELECT count(*), min(orchestrator), min(pipeline), min(status), bool_and(ended_at >= started_at)
+FROM dbt.unified.runs(path := '{DBT_FIXTURES}/*/run_results.json');
+----
+6	dbt	dbt build	failed	true
+
+query TTI
+SELECT status, raw_status, count(*) FROM dbt.unified.task_runs(path := '{DBT_FIXTURES}/v12/run_results.json') GROUP BY ALL ORDER BY ALL;
+----
+failed	fail	1
+skipped	no-op	1
+success	pass	11
+success	success	10
+success	warn	1
+
+statement ok
+CREATE SECRET dbt_test (TYPE dbt_cloud, TOKEN 'test-token', ACCOUNT_ID '70403', BASE_URL '{DBT_MOCK_API}');
+
+query TTTTT
+SELECT run_id, pipeline, status, raw_status, trigger FROM dbt.unified.runs() ORDER BY run_id;
+----
+9001	Nightly build	success	Success	schedule
+9002	CI	failed	Error	event
+9003	Finance hourly	success	Success	schedule
+9004	Nightly build	failed	Error	schedule
+9005	Finance hourly	cancelled	Cancelled	manual
+9006	Nightly build	success	Success	api
+9007	Finance hourly	success	Success	schedule
+9008	CI	running	Running	event
+
+query T
+SELECT run_id FROM dbt.unified.runs() WHERE status IN ('failed', 'cancelled') ORDER BY run_id;
+----
+9002
+9004
+9005
+
+query TTT
+SELECT task_run_id, task_name, status FROM dbt.unified.task_runs() WHERE run_id = '9004' ORDER BY task_run_id;
+----
+9004:1	Clone git repository	success
+9004:2	Create profile from connection Postgres	success
+9004:3	Invoke `dbt source freshness`	success
+9004:4	Invoke `dbt build`	failed
+
+# run_id := reads that dbt Cloud run's run_results.json as node results.
+query TTI
+SELECT orchestrator, status, count(*) FROM dbt.unified.task_runs(run_id := 9001) GROUP BY ALL ORDER BY ALL;
+----
+dbt_cloud	failed	1
+dbt_cloud	skipped	1
+dbt_cloud	success	22
+
+# Local invocations and dbt Cloud runs UNION ALL into one history.
+query TI
+SELECT orchestrator, count(*) FROM (
+  SELECT * FROM dbt.unified.runs(path := '{DBT_FIXTURES}/*/run_results.json')
+  UNION ALL SELECT * FROM dbt.unified.runs()) GROUP BY ALL ORDER BY ALL;
+----
+dbt	6
+dbt_cloud	8
+
+statement ok
+DROP SECRET dbt_test;
