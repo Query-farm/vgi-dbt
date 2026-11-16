@@ -131,15 +131,16 @@ func withExamples(tags map[string]string, lists ...[]vgi.CatalogExample) map[str
 	return tags
 }
 
-const catalogDocLLM = "dbt artifacts and dbt Cloud as SQL. Schema main streams local (or https://, or " +
-	"dbt-cloud://runs/<id>/) dbt artifact files into stable, version-tolerant tables: nodes, node_columns, depends_on, " +
-	"sources, exposures, metrics, semantic_models, groups, macros (manifest.json, schema v7-v12), run_results and " +
-	"run_timings (run_results.json, globs scan archives), catalog_columns (catalog.json) and source_freshness " +
-	"(sources.json); artifact_info triages a file's version first; descendants/ancestors walk the DAG per row; " +
-	"selector_match/parse_selector implement a strict selector subset. Every artifact function takes the path as its " +
-	"first argument; bind each once with CREATE VIEW. Schema cloud reads the dbt Cloud Admin API (accounts, projects, " +
-	"environments, jobs, runs, run_steps, run_artifacts) and Discovery API (models, tests, sources) with a dbt_cloud " +
-	"secret (TOKEN, ACCOUNT_ID, BASE_URL). Schema unified has runs/task_runs in the cross-orchestrator shape."
+const catalogDocLLM = "dbt artifacts and dbt Cloud as SQL. Schema main streams dbt artifact files - local paths " +
+	"or globs, https:// URLs, the bundled sample:// jaffle_shop artifacts, or dbt-cloud://runs/<id>/<file>.json - " +
+	"into flat, version-tolerant tables over manifest.json (schema v7-v12: the DAG's nodes and their columns, " +
+	"dependency edges, the semantic layer), run_results.json (globs scan whole archives), catalog.json and " +
+	"sources.json; it needs no credentials. Every artifact function takes the path as its first argument; bind each " +
+	"file once with CREATE VIEW. Triage an unfamiliar file first (an unknown schema version becomes a row, not a " +
+	"crash). DAG closure is a per-row (LATERAL) walk, and node selection supports a strict, enumerated subset of " +
+	"dbt's selector grammar where unsupported terms are errors. Schema cloud reads the dbt Cloud Admin API (account " +
+	"structure, job runs and their saved artifacts) and Discovery API (applied state and freshness) with a dbt_cloud " +
+	"secret (TOKEN, ACCOUNT_ID, BASE_URL). Schema unified exposes run history in the cross-orchestrator shape."
 
 // CatalogComment is the catalog's one-line description in directories.
 const CatalogComment = "Query dbt artifacts (manifest, run results, catalog, source freshness) and dbt Cloud runs, jobs and Discovery metadata as SQL tables."
@@ -167,13 +168,15 @@ var mainSchema = schemaInfo{
 	Title: "dbt Artifacts", Domain: "analytics engineering",
 	Keywords: "dbt, manifest.json, run_results.json, catalog.json, sources.json, dag, lineage, selectors, test coverage",
 	DocLLM: "Schema main reads dbt artifact files. Every table function takes the artifact path first (a local path or " +
-		"glob, an https:// URL, or dbt-cloud://runs/<run_id>/<file>.json): artifact_info(path) for triage; nodes, " +
-		"node_columns, depends_on(kind := 'nodes'|'macros'), sources, exposures, metrics, semantic_models, groups, macros " +
-		"over manifest.json; run_results and run_timings over run_results.json; catalog_columns over catalog.json; " +
-		"source_freshness over sources.json. descendants/ancestors(unique_id, manifest := path) walk the DAG per row " +
-		"(LATERAL). selector_match(...) and parse_selector(...) support tag:, path:, fqn:, package:, resource_type:, " +
-		"config.materialized: and names; graph operators are errors. Scalars parse_unique_id, normalize_relation, " +
-		"manifest_version. Table schema_versions lists supported artifact versions.",
+		"glob, an https:// URL, or dbt-cloud://runs/<run_id>/<file>.json), so two manifests (main and a pull request) " +
+		"can be compared in one query. Tables cover manifest.json (nodes, declared columns, dependency edges to nodes or " +
+		"macros, sources, exposures, the semantic layer, groups), run_results.json (node results and phase timings), " +
+		"catalog.json (warehouse-observed columns) and sources.json (freshness), normalized across manifest schema v7 to " +
+		"v12: fields a version lacks are NULL and adapter blobs such as config and meta stay JSON. Start with artifact " +
+		"triage on an unfamiliar file. Descendant/ancestor walks take a unique_id and the manifest path and run per row " +
+		"(LATERAL). Selector matching supports tag:, path:, fqn:, package:, resource_type:, config.materialized: and " +
+		"names; graph operators are errors. Scalar helpers split unique_ids, normalize relation names and read a " +
+		"manifest's schema version, and the supported artifact versions are themselves a table.",
 	DocMD: "## main\n\nTables over dbt's four artifact files, normalized across manifest schema v7 to v12. Every " +
 		"function takes the artifact path as its first argument, so two manifests (main and a pull request) can be " +
 		"compared in one query; bind each file once as a view and join the views.\n\n" +
