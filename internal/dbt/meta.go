@@ -156,7 +156,9 @@ const CatalogDocMD = "# dbt\n\n" +
 	"`sample://` jaffle_shop artifacts, or a dbt Cloud run's artifacts) and needs no credentials. Run artifact triage " +
 	"first on an unfamiliar file: an unknown schema version becomes a row, not a crash. The `cloud` schema reads the " +
 	"dbt Cloud Admin and Discovery APIs with a `dbt_cloud` secret, and the `unified` schema exposes runs and task runs " +
-	"in the shape every orchestrator worker shares, so dbt runs union with Airflow, Dagster or Prefect runs."
+	"in the shape every orchestrator worker shares, so dbt runs union with Airflow, Dagster or Prefect runs.\n\n" +
+	"See dbt's [artifact reference](https://docs.getdbt.com/reference/artifacts/dbt-artifacts) and the " +
+	"[dbt Cloud API docs](https://docs.getdbt.com/docs/dbt-cloud-apis/overview)."
 
 // schemaInfo is the per-schema discovery text.
 type schemaInfo struct {
