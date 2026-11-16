@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2 (2026-11-16)
+
+- Bump vgi-go to 0.42.2.
+
 ## 0.1.1
 
 - Catalog and schema docs are overviews instead of object lists, and schemas have their own one-line comments (vgi-lint 2.8: VGI173, VGI102).
