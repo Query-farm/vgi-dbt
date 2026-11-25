@@ -28,7 +28,7 @@ The artifact half runs offline and needs no credentials, no network and no dbt i
 ```sql
 INSTALL vgi FROM community;     -- Haybarn 2.0; on DuckDB 2.0 use the query_farm repository
 LOAD vgi;
-ATTACH 'dbt' (TYPE vgi, LOCATION 'github-auto://Query-farm/vgi-dbt@v0.1.3');
+ATTACH 'dbt' (TYPE vgi, LOCATION 'github-auto://Query-farm/vgi-dbt@v0.2.0');
 ```
 
 <details><summary>Other ways to run it</summary>
@@ -36,7 +36,7 @@ ATTACH 'dbt' (TYPE vgi, LOCATION 'github-auto://Query-farm/vgi-dbt@v0.1.3');
 - **DuckDB 2.0**:
   `SET allow_extension_repositories = 'allowed'; CREATE EXTENSION REPOSITORY IF NOT EXISTS query_farm WITH PREFIX 'https://duckdb-extensions.query.farm'; INSTALL vgi FROM query_farm; LOAD vgi FROM query_farm;`
   then attach as above.
-- **Docker** (HTTP): `docker run -p 8000:8000 ghcr.io/query-farm/vgi-dbt:0.1.3`, then
+- **Docker** (HTTP): `docker run -p 8000:8000 ghcr.io/query-farm/vgi-dbt:0.2.0`, then
   `ATTACH 'dbt' (TYPE vgi, LOCATION 'http://localhost:8000')`.
 - **From source**: `make build` (Go 1.26+, a C toolchain for cgo), then
   `ATTACH 'dbt' (TYPE vgi, LOCATION '/abs/path/to/bin/vgi-dbt-worker')`.
@@ -244,7 +244,7 @@ SELECT * FROM dbt.main.depends_on('target/manifest.json') EXCEPT SELECT * FROM d
 ## How it is tested
 
 `make check` runs gofmt, go vet and golangci-lint, the Go unit and fuzz-seed tests, and the
-SQLLogicTests through the real `vgi` extension (Haybarn 2.0.0rc11) over stdio, `launch:` (unix
+SQLLogicTests through the real `vgi` extension (Haybarn 2.0.1rc3) over stdio, `launch:` (unix
 socket) and HTTP. It finishes with vgi-lint at `fail_on = "info"`.
 
 - **Artifacts**: real dbt-core + dbt-duckdb runs of [`test/dbt_project`](test/dbt_project),
